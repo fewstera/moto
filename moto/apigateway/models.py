@@ -297,14 +297,10 @@ class Stage(BaseModel, dict):
 class ApiKey(BaseModel, dict):
 
     def __init__(self, name=None, description=None, enabled=True,
-                 generateDistinctId=False, value=None, stageKeys=None, customerId=None):
+                 value=None, stageKeys=None, customerId=None):
         super(ApiKey, self).__init__()
         self['id'] = create_id()
-        if generateDistinctId:
-            # Best guess of what AWS does internally
-            self['value'] = ''.join(random.sample(string.ascii_letters + string.digits, 40))
-        else:
-            self['value'] = value
+        self['value'] = value if value else ''.join(random.sample(string.ascii_letters + string.digits, 40))
         self['name'] = name
         self['customerId'] = customerId
         self['description'] = description
