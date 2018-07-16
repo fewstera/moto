@@ -247,4 +247,7 @@ class APIGatewayResponse(BaseResponse):
             apikey_response = self.backend.get_apikey(apikey)
         elif self.method == 'DELETE':
             apikey_response = self.backend.delete_apikey(apikey)
+        elif self.method == 'PATCH':
+            patch_operations = self._get_param('patchOperations')
+            apikey_response = self.backend.update_apikey(apikey, patch_operations)
         return 200, {}, json.dumps(apikey_response)

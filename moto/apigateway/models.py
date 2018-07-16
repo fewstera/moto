@@ -10,7 +10,7 @@ from boto3.session import Session
 import responses
 from moto.core import BaseBackend, BaseModel
 from .utils import create_id
-from .exceptions import StageNotFoundException
+from .exceptions import ApiKeyNotFoundException, BadRequestException, StageNotFoundException
 
 STAGE_URL = "https://{api_id}.execute-api.{region_name}.amazonaws.com/{stage_name}"
 
@@ -291,7 +291,7 @@ class Stage(BaseModel, dict):
         elif op['op'] == 'replace':
             self['variables'][key] = op['value']
         else:
-            raise Exception('Patch operation "%s" not implemented' % op['op'])
+            raise BadRequestException('Invalid patch path  \'{0}\' specified for op \'{1}\'.'.format(op['path'], op['op']))
 
 
 class ApiKey(BaseModel, dict):
@@ -307,6 +307,19 @@ class ApiKey(BaseModel, dict):
         self['enabled'] = enabled
         self['createdDate'] = self['lastUpdatedDate'] = int(time.time())
         self['stageKeys'] = stageKeys
+
+    def apply_operations(self, patch_operations):
+        replaceable_paths = ['/customerId', '/description', '/name']
+        for op in patch_operations:
+            if op['path'] in replaceable_paths and op['op'] == 'replace':
+                propertyToReplace = op['path'][1:]
+                self[propertyToReplace] = op['value']
+            elif op['path'] == '/enabled' and op['op'] == 'replace':
+                self['enabled'] = (op['value'] == 'true' or op['value'] == True)
+            else:
+                raise BadRequestException('Invalid patch path  \'{0}\' specified for op \'{1}\'.'.format(op['path'], op['op']))
+        return self
+
 
 
 class RestAPI(BaseModel):
@@ -570,7 +583,15 @@ class APIGatewayBackend(BaseBackend):
         return list(self.keys.values())
 
     def get_apikey(self, api_key_id):
+        if api_key_id not in self.keys:
+            raise ApiKeyNotFoundException()
+
         return self.keys[api_key_id]
+
+    def update_apikey(self, api_key_id, patch_operations):
+        apiKey = self.get_apikey(api_key_id)
+        return apiKey.apply_operations(patch_operations)
+
 
     def delete_apikey(self, api_key_id):
         self.keys.pop(api_key_id)
